@@ -25,22 +25,35 @@
         <br><br>
         <label for="valveopen">Valve open:</label>
         <select id="valveopen" onchange="enterValue(this)">
-          <option value="1">1s</option>
-          <option value="5">5s</option>
-          <option value="10">10s</option>
-          <option value="20">20s</option>
+          <option value="5">0.5s</option>
+          <option value="10">1.0s</option>
+          <option value="15">1.5s</option>
+          <option value="20">2.0s</option>
+          <option value="25">2.5s</option>
+          <option value="30">3.0s</option>
+          <option value="35">3.5s</option>
+          <option value="40">4.0s</option>
+          <option value="45">4.5s</option>
+          <option value="50">5.0s</option>
         </select>
         <br><br>
         <label for="valveclose">Valve closed:</label>
         <select id="valveclose" onchange="enterValue(this)">
-          <option value="1">1s</option>
-          <option value="5">5s</option>
-          <option value="10">10s</option>
-          <option value="20">20s</option>
+          <option value="5">0.5s</option>
+          <option value="10">1.0s</option>
+          <option value="15">1.5s</option>
+          <option value="20">2.0s</option>
+          <option value="25">2.5s</option>
+          <option value="30">3.0s</option>
+          <option value="35">3.5s</option>
+          <option value="40">4.0s</option>
+          <option value="45">4.5s</option>
+          <option value="50">5.0s</option>
         </select>
       </div>
       <div class="card">
         <p class="card-title">Device</p>
+        <p class="state">Valve: <span id="valve"></span></p>
         <p class="state">Wifi: <span id="ssid"></span></p>
         <p class="state">Version: <span id="softwareVersion"></span></p>
         <p class="state">Heap/Frag: <span id="ram"></span>/<span id="frag"></span></p>

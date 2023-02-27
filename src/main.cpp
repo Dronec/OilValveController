@@ -9,7 +9,7 @@
 #include <Arduino_JSON.h>
 #include <EEPROM.h>
 
-const char *softwareVersion = "0.01";
+const char *softwareVersion = "0.90";
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
@@ -18,9 +18,13 @@ WiFiEventHandler e1;
 
 // EEPROM settings
 
-static long valveopen = 1;
-static long valveclose = 1;
+static byte valveopen = 50;
+static byte valveclose = 50;
+static byte valveposition;
+static long sync;
+static long globalsync;
 static bool timer = false;
+static bool valve = false;
 
 // Initialize LittleFS
 void initLittleFS()
@@ -70,6 +74,10 @@ String getOutputStates()
   myArray["stats"]["uptime"] = millisToTime(millis());
   myArray["stats"]["ram"] = (int)ESP.getFreeHeap();
   myArray["stats"]["frag"] = (int)ESP.getHeapFragmentation();
+  if (valve)
+    myArray["stats"]["valve"] = "Open";
+  else
+    myArray["stats"]["valve"] = "Closed";
 
   // // sending values
   myArray["settings"]["valveopen"] = valveopen;
@@ -108,8 +116,8 @@ void readEEPROMSettings()
 
 void writeEEPROMSettings()
 {
-  EEPROM.put(0, (byte)valveopen);
-  EEPROM.put(1, (byte)valveclose);
+  EEPROM.put(0, valveopen);
+  EEPROM.put(1, valveclose);
   EEPROM.put(2, (byte)timer);
   Serial.print("EEPROM commit ");
   Serial.println(EEPROM.commit());
@@ -223,6 +231,7 @@ void initWebServer()
 void setup()
 {
   Serial.begin(115200);
+  globalsync = millis();
   Serial.println();
   EEPROM.begin(4);
   readEEPROMSettings();
@@ -267,7 +276,29 @@ void setup()
 
 void loop()
 {
-  delay(1000);
-  ws.cleanupClients();
-  notifyClients(getOutputStates());
+  if (timer)
+  {
+    sync = millis();
+    if (valve)
+      valveposition = valveopen;
+    else
+      valveposition = valveclose;
+    while (sync + valveposition * 100 > millis())
+    {
+      delay(200);
+      if (globalsync + 500 < millis())
+      {
+        globalsync = millis();
+        ws.cleanupClients();
+        notifyClients(getOutputStates());
+      }
+    }
+    valve = !valve;
+  }
+  else
+  {
+    ws.cleanupClients();
+    notifyClients(getOutputStates());
+    delay(500);
+  }
 }
