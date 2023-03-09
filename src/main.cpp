@@ -9,12 +9,18 @@
 #include <Arduino_JSON.h>
 #include <EEPROM.h>
 
+#define ControllerAP
+
 const char *softwareVersion = "0.90";
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 WiFiEventHandler e1;
+
+// Hex command to send to serial for open/close relay
+byte rel1ON[] = {0xA0, 0x01, 0x01, 0xA2};
+byte rel1OFF[] = {0xA0, 0x01, 0x00, 0xA1};
 
 // EEPROM settings
 
@@ -67,10 +73,6 @@ String getOutputStates()
   // sending stats
   myArray["stats"]["ssid"] = WiFi.SSID().c_str();
   myArray["stats"]["softwareVersion"] = softwareVersion;
-  // myArray["stats"]["lastInternetTime"] = millisToTime((millis() - lastInternetTime - loopDelay));
-  // myArray["stats"]["nextCheckIn"] = millisToTime((timer - millis() + loopDelay));
-  // myArray["stats"]["fails"] = fails;
-  // myArray["stats"]["reboots"] = reboots;
   myArray["stats"]["uptime"] = millisToTime(millis());
   myArray["stats"]["ram"] = (int)ESP.getFreeHeap();
   myArray["stats"]["frag"] = (int)ESP.getHeapFragmentation();
@@ -82,15 +84,9 @@ String getOutputStates()
   // // sending values
   myArray["settings"]["valveopen"] = valveopen;
   myArray["settings"]["valveclose"] = valveclose;
-  // myArray["settings"]["rearCamMode"] = rearCamMode;
-  // myArray["settings"]["serialOutput"] = serialOutput;
-  // myArray["settings"]["loopDelay"] = loopDelay;
-  // myArray["settings"]["canSpeed"] = canSpeed;
-  // myArray["settings"]["canInterface"] = canInterface;
 
   // sending checkboxes
   myArray["checkboxes"]["timer"] = timer;
-  // myArray["checkboxes"]["relay2"] = pp2Enabled;
 
   String jsonString = JSON.stringify(myArray);
   return jsonString;
@@ -106,12 +102,6 @@ void readEEPROMSettings()
   valveopen = EEPROM.read(0);
   valveclose = EEPROM.read(1);
   timer = (bool)EEPROM.read(2);
-  // serialOutput = 0; // serialOutput = preferences.getInt("serialOutput", 0);
-  // autoSwitch = preferences.getBool("autoSwitch", true);
-  // canInterface = preferences.getInt("canInterface", 0);
-  // canSpeed = preferences.getInt("canSpeed", 500);
-  // rearCamMode = preferences.getInt("rearCamMode", 1);
-  // loopDelay = preferences.getInt("loopDelay", 10);
 }
 
 void writeEEPROMSettings()
@@ -121,14 +111,8 @@ void writeEEPROMSettings()
   EEPROM.put(2, (byte)timer);
   Serial.print("EEPROM commit ");
   Serial.println(EEPROM.commit());
-  // preferences.putInt("frontCamTimeout", frontCamTimeout);
-  // preferences.putInt("serialOutput", serialOutput);
-  // preferences.putBool("autoSwitch", autoSwitch);
-  // preferences.putInt("canInterface", canInterface);
-  // preferences.putInt("canSpeed", canSpeed);
-  // preferences.putInt("rearCamMode", rearCamMode);
-  // preferences.putInt("loopDelay", loopDelay);
 }
+
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
 {
   AwsFrameInfo *info = (AwsFrameInfo *)arg;
@@ -145,23 +129,10 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
     {
       valveclose = atoi(webmsg["valveclose"]);
     }
-    // if (webmsg.hasOwnProperty("frontCamTimeout"))
-    //   frontCamTimeout = atoi(webmsg["frontCamTimeout"]);
-    // if (webmsg.hasOwnProperty("serialOutput"))
-    //   serialOutput = atoi(webmsg["serialOutput"]);
-    // if (webmsg.hasOwnProperty("rearCamMode"))
-    //   rearCamMode = atoi(webmsg["rearCamMode"]);
-    // if (webmsg.hasOwnProperty("loopDelay"))
-    //   loopDelay = atoi(webmsg["loopDelay"]);
-    // if (webmsg.hasOwnProperty("canInterface"))
-    //   canInterface = atoi(webmsg["canInterface"]);
-    // if (webmsg.hasOwnProperty("canSpeed"))
-    //   canSpeed = atoi(webmsg["canSpeed"]);
+
     // checkboxes
     if (webmsg.hasOwnProperty("timer"))
       timer = webmsg["timer"];
-    // if (webmsg.hasOwnProperty("relay2"))
-    //   switchRelay(2, webmsg["relay2"]);
 
     if (webmsg.hasOwnProperty("command"))
     {
@@ -171,12 +142,6 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
       case 0:
         ESP.restart();
         break;
-        // case 1:
-        //   timer = timer + checkIncrement * 15;
-        //   break;
-        // case 2:
-        //   CheckInternet();
-        //   break;
       }
     }
     writeEEPROMSettings();
@@ -230,7 +195,7 @@ void initWebServer()
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(9600);
   globalsync = millis();
   Serial.println();
   EEPROM.begin(4);
@@ -248,8 +213,6 @@ void setup()
 
   Serial.print("Setting soft-AP ... ");
   Serial.println(WiFi.softAP(ssid, password) ? "Ready" : "Failed!");
-  // WiFi.softAP(ssid);
-  // WiFi.softAP(ssid, password, channel, hidden, max_connection)
 
   Serial.print("Soft-AP IP address = ");
   Serial.println(WiFi.softAPIP());
@@ -267,11 +230,8 @@ void setup()
 
 #endif
 
-  // lastInternetTime = 0;
-  // timer = millis() + checkIncrement * 5;
   initLittleFS();
   initWebServer();
-  // delay(DefaultOffTime);
 }
 
 void loop()
@@ -294,6 +254,14 @@ void loop()
       }
     }
     valve = !valve;
+    if (valve)
+    {
+      Serial.write(rel1ON, sizeof(rel1ON));
+    }
+    else
+    {
+      Serial.write(rel1OFF, sizeof(rel1OFF));
+    }
   }
   else
   {
